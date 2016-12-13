@@ -49,7 +49,7 @@ public class CurlActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 
-		int index = 2;
+		int index = 0;
 		if (getLastNonConfigurationInstance() != null) {
 			index = (Integer) getLastNonConfigurationInstance();
 		}
@@ -63,10 +63,11 @@ public class CurlActivity extends Activity {
 		mCurlView.setSizeChangedObserver(new SizeChangedObserver());
 		mCurlView.setCurrentIndex(index);
 		mCurlView.setBackgroundColor(0xFFC0C0C0);
+		mCurlView.setAllowLastPageCurl(false);
 		mCurlView.setCurlAnimatorListener(new CurlView.CurlAnimatorListener(){
 			@Override
 			public void onComplete(int i) {
-				L.e("onComplete: "+i);
+				L.e("onComplete: "+(i==1?"SET_CURL_TO_LEFT":"SET_CURL_TO_RIGHT"));
 
 				Observable.create(f->{
 					mTextView.setText(String.valueOf(mCurlView.getCurrentIndex()));
@@ -79,7 +80,7 @@ public class CurlActivity extends Activity {
 
 			@Override
 			public void onStart(int i) {
-				L.e("onStart:"+i);
+				L.e("onStart:"+(i==1?"CURL_LEFT":"CURL_RIGHT"));
 				Observable.create(f->{
 					//mRelativeLayout.setVisibility(View.GONE);
 					f.onCompleted();
