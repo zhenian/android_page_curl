@@ -90,6 +90,10 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 	// One page is the default.
 	private int mViewMode = SHOW_ONE_PAGE;
 
+	private CurlAnimatorListener curlAnimatorListener;
+	private boolean startListen = false;
+	private int completeAnimationTargetEvent = DO_NOTHING;
+
 	/**
 	 * Default constructor.
 	 */
@@ -191,6 +195,10 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 			}
 			mAnimate = false;
 			requestRender();
+			if(curlAnimatorListener != null && completeAnimationTargetEvent != DO_NOTHING){
+				curlAnimatorListener.onComplete(completeAnimationTargetEvent);
+			}
+			completeAnimationTargetEvent = DO_NOTHING;
 		} else {
 			mPointerPos.mPos.set(mAnimationSource);
 			float t = (float) (currentTime - mAnimationStartTime)
@@ -317,6 +325,10 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 			mAnimationStartTime = SystemClock.uptimeMillis();
 			mAnimationDurationTime = 300;
 			mAnimationTargetEvent = DO_NOTHING;
+			if(curlAnimatorListener != null){
+				curlAnimatorListener.onStart(mCurlState);
+				startListen = true;
+			}
 			mAnimate = true;
 			requestRender();
 			break;
@@ -327,8 +339,11 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 			}
 			break;
 		}
-		case MotionEvent.ACTION_CANCEL:
+		case MotionEvent.ACTION_CANCEL:{
+			L.e("MotionEvent.ACTION_CANCEL");
+		}
 		case MotionEvent.ACTION_UP: {
+			L.e("MotionEvent.ACTION_UP");
 			if (mCurlState == CURL_LEFT || mCurlState == CURL_RIGHT) {
 				// Animation source is the point from where animation starts.
 				// Also it's handled in a way we actually simulate touch events
@@ -351,6 +366,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 					mAnimationTarget.x = mRenderer
 							.getPageRect(CurlRenderer.PAGE_RIGHT).right;
 					mAnimationTargetEvent = SET_CURL_TO_RIGHT;
+					completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
 				} else {
 					// On left side target depends on visible pages.
 					mAnimationTarget.set(mDragStartPos);
@@ -360,6 +376,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 						mAnimationTarget.x = rightRect.left;
 					}
 					mAnimationTargetEvent = SET_CURL_TO_LEFT;
+					completeAnimationTargetEvent = SET_CURL_TO_LEFT;
 				}
 				mAnimate = true;
 				requestRender();
@@ -785,6 +802,10 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 		}
 	}
 
+	public void setCurlAnimatorListener(CurlAnimatorListener curlAnimatorListener) {
+		this.curlAnimatorListener = curlAnimatorListener;
+	}
+
 	/**
 	 * Provider for feeding 'book' with bitmaps which are used for rendering
 	 * pages.
@@ -825,6 +846,11 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 		 * Called once CurlView size changes.
 		 */
 		public void onSizeChanged(int width, int height);
+	}
+
+	public interface CurlAnimatorListener {
+		public void onStart(int i);
+		public void onComplete(int i);
 	}
 
 }

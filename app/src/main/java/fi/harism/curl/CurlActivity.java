@@ -24,6 +24,12 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
 
 /**
  * Simple Activity for curl testing.
@@ -32,22 +38,57 @@ import android.os.Bundle;
  */
 public class CurlActivity extends Activity {
 
+
+
 	private CurlView mCurlView;
+	private TextView mTextView;
+	private RelativeLayout mRelativeLayout;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 
-		int index = 0;
+		int index = 2;
 		if (getLastNonConfigurationInstance() != null) {
 			index = (Integer) getLastNonConfigurationInstance();
 		}
+		mRelativeLayout = (RelativeLayout)findViewById(R.id.text_container);
+
+		mTextView = (TextView) findViewById(R.id.text);
+		mTextView.setText(String.valueOf(2));
+
 		mCurlView = (CurlView) findViewById(R.id.curl);
 		mCurlView.setPageProvider(new PageProvider());
 		mCurlView.setSizeChangedObserver(new SizeChangedObserver());
 		mCurlView.setCurrentIndex(index);
 		mCurlView.setBackgroundColor(0xFFC0C0C0);
+		mCurlView.setCurlAnimatorListener(new CurlView.CurlAnimatorListener(){
+			@Override
+			public void onComplete(int i) {
+				L.e("onComplete: "+i);
+
+				Observable.create(f->{
+					mTextView.setText(String.valueOf(mCurlView.getCurrentIndex()));
+					//mRelativeLayout.setVisibility(View.VISIBLE);
+					f.onCompleted();
+				}).subscribeOn(AndroidSchedulers.mainThread())
+						.observeOn(AndroidSchedulers.mainThread())
+						.subscribe(f->{},e->e.printStackTrace());
+			}
+
+			@Override
+			public void onStart(int i) {
+				L.e("onStart:"+i);
+				Observable.create(f->{
+					//mRelativeLayout.setVisibility(View.GONE);
+					f.onCompleted();
+				}).subscribeOn(AndroidSchedulers.mainThread())
+						.observeOn(AndroidSchedulers.mainThread())
+						.subscribe(f->{},e->e.printStackTrace());
+
+			}
+		});
 
 		// This is something somewhat experimental. Before uncommenting next
 		// line, please see method comments in CurlView.
@@ -85,7 +126,7 @@ public class CurlActivity extends Activity {
 			return 5;
 		}
 
-		private Bitmap loadBitmap(int width, int height, int index) {
+		private Bitmap loadBitmap(int width, int height, int index, int page) {
 			Bitmap b = Bitmap.createBitmap(width, height,
 					Bitmap.Config.ARGB_8888);
 			b.eraseColor(0xFFFFFFFF);
@@ -121,6 +162,10 @@ public class CurlActivity extends Activity {
 			d.setBounds(r);
 			d.draw(c);
 
+			Paint contentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+			contentPaint.setTextSize(20);
+			contentPaint.setAntiAlias(true);
+			c.drawText("第"+page+"页", 20, 50, contentPaint);
 			return b;
 		}
 
@@ -130,22 +175,22 @@ public class CurlActivity extends Activity {
 			switch (index) {
 			// First case is image on front side, solid colored back.
 			case 0: {
-				Bitmap front = loadBitmap(width, height, 0);
+				Bitmap front = loadBitmap(width, height, 0, 0);
 				page.setBitmap(front, CurlPage.SIDE_FRONT);
 				page.setColor(Color.rgb(180, 180, 180), CurlPage.SIDE_BACK);
 				break;
 			}
 			// Second case is image on back side, solid colored front.
 			case 1: {
-				Bitmap back = loadBitmap(width, height, 2);
+				Bitmap back = loadBitmap(width, height, 2, 1);
 				page.setBitmap(back, CurlPage.SIDE_BACK);
 				page.setColor(Color.rgb(127, 140, 180), CurlPage.SIDE_FRONT);
 				break;
 			}
 			// Third case is images on both sides.
 			case 2: {
-				Bitmap front = loadBitmap(width, height, 1);
-				Bitmap back = loadBitmap(width, height, 3);
+				Bitmap front = loadBitmap(width, height, 1, 2);
+				Bitmap back = loadBitmap(width, height, 3, 2);
 				page.setBitmap(front, CurlPage.SIDE_FRONT);
 				page.setBitmap(back, CurlPage.SIDE_BACK);
 				break;
@@ -153,8 +198,8 @@ public class CurlActivity extends Activity {
 			// Fourth case is images on both sides - plus they are blend against
 			// separate colors.
 			case 3: {
-				Bitmap front = loadBitmap(width, height, 2);
-				Bitmap back = loadBitmap(width, height, 1);
+				Bitmap front = loadBitmap(width, height, 2, 3);
+				Bitmap back = loadBitmap(width, height, 1, 3);
 				page.setBitmap(front, CurlPage.SIDE_FRONT);
 				page.setBitmap(back, CurlPage.SIDE_BACK);
 				page.setColor(Color.argb(127, 170, 130, 255),
@@ -165,7 +210,7 @@ public class CurlActivity extends Activity {
 			// Fifth case is same image is assigned to front and back. In this
 			// scenario only one texture is used and shared for both sides.
 			case 4:
-				Bitmap front = loadBitmap(width, height, 0);
+				Bitmap front = loadBitmap(width, height, 0, 4);
 				page.setBitmap(front, CurlPage.SIDE_BOTH);
 				page.setColor(Color.argb(127, 255, 255, 255),
 						CurlPage.SIDE_BACK);
@@ -183,10 +228,10 @@ public class CurlActivity extends Activity {
 		public void onSizeChanged(int w, int h) {
 			if (w > h) {
 				mCurlView.setViewMode(CurlView.SHOW_TWO_PAGES);
-				mCurlView.setMargins(.1f, .05f, .1f, .05f);
+				mCurlView.setMargins(.0f, .0f, .0f, .0f);
 			} else {
 				mCurlView.setViewMode(CurlView.SHOW_ONE_PAGE);
-				mCurlView.setMargins(.1f, .1f, .1f, .1f);
+				mCurlView.setMargins(.0f, .0f, .0f, .0f);
 			}
 		}
 	}
