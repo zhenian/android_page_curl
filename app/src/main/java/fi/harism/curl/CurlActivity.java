@@ -17,13 +17,18 @@
 package fi.harism.curl;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
+import android.view.Display;
+import android.view.WindowManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +59,13 @@ public class CurlActivity extends Activity {
 		this.initCurlView();
 	}
 
+	public static DisplayMetrics getDefaultDisplayMetrics(Context context) {
+		WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+		Display display = windowManager.getDefaultDisplay();
+		DisplayMetrics dm = new DisplayMetrics();
+		display.getMetrics(dm);
+		return dm;
+	}
 
 
 	private void initCurlView(){
@@ -85,6 +97,18 @@ public class CurlActivity extends Activity {
 				}).subscribeOn(AndroidSchedulers.mainThread())
 						.observeOn(AndroidSchedulers.mainThread())
 						.subscribe(f->{},e->e.printStackTrace());
+
+			}
+
+			@Override
+			public void onTap(PointF pointF, PointF rawPointF){
+				L.e("onTap:");
+				int w = getDefaultDisplayMetrics(CurlActivity.this).widthPixels;
+				if(rawPointF.x > w / 2.0){
+					mCurlView.pageNext();
+				}else{
+					mCurlView.pagePrevious();
+				}
 
 			}
 		});
