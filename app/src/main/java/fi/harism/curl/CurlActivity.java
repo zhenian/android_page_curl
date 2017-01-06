@@ -28,6 +28,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.view.Display;
+import android.view.KeyEvent;
 import android.view.WindowManager;
 
 import java.util.ArrayList;
@@ -112,6 +113,23 @@ public class CurlActivity extends Activity {
 
 			}
 		});
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_VOLUME_DOWN: {
+				setVolumeControlStream(0);
+				mCurlView.pageNext();
+				return true;
+			}
+			case KeyEvent.KEYCODE_VOLUME_UP: {
+				setVolumeControlStream(0);
+				mCurlView.pagePrevious();
+				return true;
+			}
+		}
+		return super.onKeyDown(keyCode, event);
 	}
 
 	private void initData(){

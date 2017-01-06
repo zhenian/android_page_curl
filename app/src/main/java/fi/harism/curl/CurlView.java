@@ -440,6 +440,8 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 							completeAnimationTargetEvent = SET_CURL_TO_LEFT;
 						}
 					}
+					L.e("========>> mAnimationSource=("+mAnimationSource.x+","+mAnimationSource.y+")");
+					L.e("========>> mAnimationTarget=("+mAnimationTarget.x+","+mAnimationTarget.y+")");
 
 					mAnimate = true;
 					requestRender();
@@ -860,168 +862,171 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 		this.curlAnimatorListener = curlAnimatorListener;
 	}
 
-    public void pageNext(){
-        if ((mAnimate && mAnimationTargetEvent != DO_NOTHING) || mPageProvider == null) {
-            return;
-        }
-        // We need page rects quite extensively so get them for later use.
-        RectF rightRect = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT);
-        RectF leftRect = mRenderer.getPageRect(CurlRenderer.PAGE_LEFT);
 
-        int w = this.mPageBitmapWidth;
-        int h =  this.mPageBitmapHeight;
+	public void pageNext(){
+		if ((mAnimate && mAnimationTargetEvent != DO_NOTHING) || mPageProvider == null) {
+			return;
+		}
+		// We need page rects quite extensively so get them for later use.
+		RectF rightRect = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT);
+		RectF leftRect = mRenderer.getPageRect(CurlRenderer.PAGE_LEFT);
 
-        // Store pointer position.
-        mPointerPosOld.set(mPointerPos.mPos);
-        mPointerPos.mPos.set(w, h * 2/3);
-        L.e("----->> start pos: x="+w+"   y="+ h * 2/3);
-        mRenderer.translate(mPointerPos.mPos);
-        mPointerPos.mPressure = 0.0f;
+		int w = this.mPageBitmapWidth;
+		int h =  this.mPageBitmapHeight;
 
-
-        // Once we receive pointer down event its position is mapped to
-        // right or left edge of page and that'll be the position from where
-        // user is holding the paper to make curl happen.
-        mDragStartPos.set(mPointerPos.mPos);
-
-        // First we make sure it's not over or below page. Pages are
-        // supposed to be same height so it really doesn't matter do we use
-        // left or right one.
-        if (mDragStartPos.y > rightRect.top) {
-            mDragStartPos.y = rightRect.top;
-        } else if (mDragStartPos.y < rightRect.bottom) {
-            mDragStartPos.y = rightRect.bottom;
-        }
-
-        // Then we have to make decisions for the user whether curl is going
-        // to happen from left or right, and on which page.
-        if (mViewMode == SHOW_TWO_PAGES) {
-            if (mDragStartPos.x >= rightRect.left && mCurrentIndex < mPageProvider.getPageCount()) {
-                mDragStartPos.x = rightRect.right;
-                if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
-                    return ;
-                }
-                startCurl(CURL_RIGHT);
-            }
-        } else if (mViewMode == SHOW_ONE_PAGE) {
-            float halfX = (rightRect.right + rightRect.left) / 2;
-            if (mDragStartPos.x >= halfX && mCurrentIndex < mPageProvider.getPageCount()) {
-                mDragStartPos.x = rightRect.right;
-                if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
-                    return ;
-                }
-                startCurl(CURL_RIGHT);
-            }
-        }
-        // If we have are in curl state, let this case clause flow through
-        // to next one. We have pointer position and drag position defined
-        // and this will create first render request given these points.
-        if (mCurlState == CURL_NONE) {
-            return ;
-        }
-
-        if(curlAnimatorListener != null){
-            curlAnimatorListener.onStart(mCurlState);
-            startListen = true;
-        }
-
-        mAnimationSource.set(mPointerPosOld);
-        mAnimationStartTime = SystemClock.uptimeMillis();
-        mAnimationDurationTime = 400;
+		// Store pointer position.
+		mPointerPos.mPos.set(0.5f, 0);
+		mPointerPosOld.set(mPointerPos.mPos);
+		mPointerPos.mPos.set(w, h/2);
+		//L.e("----->> start pos: x="+w+"   y="+h * 2/3);
+		mRenderer.translate(mPointerPos.mPos);
+		mPointerPos.mPressure = 0.0f;
 
 
-        // --- TOP
-        // On left side target depends on visible pages.
-        mAnimationTarget.set(mDragStartPos);
-        if (mCurlState == CURL_RIGHT || mViewMode == SHOW_TWO_PAGES) {
-            mAnimationTarget.x = leftRect.left;
-        } else {
-            mAnimationTarget.x = rightRect.left;
-        }
-        mAnimationTargetEvent = SET_CURL_TO_LEFT;
-        completeAnimationTargetEvent = SET_CURL_TO_LEFT;
+		// Once we receive pointer down event its position is mapped to
+		// right or left edge of page and that'll be the position from where
+		// user is holding the paper to make curl happen.
+		mDragStartPos.set(mPointerPos.mPos);
 
-        mAnimate = true;
-        requestRender();
-    }
+		// First we make sure it's not over or below page. Pages are
+		// supposed to be same height so it really doesn't matter do we use
+		// left or right one.
+		if (mDragStartPos.y > rightRect.top) {
+			mDragStartPos.y = rightRect.top;
+		} else if (mDragStartPos.y < rightRect.bottom) {
+			mDragStartPos.y = rightRect.bottom;
+		}
 
-    public void pagePrevious(){
-        if ((mAnimate && mAnimationTargetEvent != DO_NOTHING) || mPageProvider == null) {
-            return;
-        }
-        // We need page rects quite extensively so get them for later use.
-        RectF rightRect = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT);
-        RectF leftRect = mRenderer.getPageRect(CurlRenderer.PAGE_LEFT);
+		// Then we have to make decisions for the user whether curl is going
+		// to happen from left or right, and on which page.
+		if (mViewMode == SHOW_TWO_PAGES) {
+			if (mDragStartPos.x >= rightRect.left && mCurrentIndex < mPageProvider.getPageCount()) {
+				mDragStartPos.x = rightRect.right;
+				if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
+					return ;
+				}
+				startCurl(CURL_RIGHT);
+			}
+		} else if (mViewMode == SHOW_ONE_PAGE) {
+			float halfX = (rightRect.right + rightRect.left) / 2;
+			if (mDragStartPos.x >= halfX && mCurrentIndex < mPageProvider.getPageCount()) {
+				mDragStartPos.x = rightRect.right;
+				if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
+					return ;
+				}
+				startCurl(CURL_RIGHT);
+			}
+		}
+		// If we have are in curl state, let this case clause flow through
+		// to next one. We have pointer position and drag position defined
+		// and this will create first render request given these points.
+		if (mCurlState == CURL_NONE) {
+			return ;
+		}
 
-        int w = this.mPageBitmapWidth;
-        int h =  this.mPageBitmapHeight;
+		if(curlAnimatorListener != null){
+			curlAnimatorListener.onStart(mCurlState);
+			startListen = true;
+		}
 
-        // Store pointer position.
-        mPointerPosOld.set(mPointerPos.mPos);
-        mPointerPos.mPos.set(0,  h * 2/3);
-        L.e("----->> start pos: x="+w+"   y="+ h * 2/3);
-        mRenderer.translate(mPointerPos.mPos);
-        mPointerPos.mPressure = 0.0f;
+		mAnimationSource.set(mPointerPosOld);
+		mAnimationStartTime = SystemClock.uptimeMillis();
+		mAnimationDurationTime = 400;
 
 
-        // Once we receive pointer down event its position is mapped to
-        // right or left edge of page and that'll be the position from where
-        // user is holding the paper to make curl happen.
-        mDragStartPos.set(mPointerPos.mPos);
+		// --- TOP
+		// On left side target depends on visible pages.
+		mAnimationTarget.set(mDragStartPos);
+		if (mCurlState == CURL_RIGHT || mViewMode == SHOW_TWO_PAGES) {
+			mAnimationTarget.x = leftRect.left;
+		} else {
+			mAnimationTarget.x = rightRect.left;
+		}
+		mAnimationTargetEvent = SET_CURL_TO_LEFT;
+		completeAnimationTargetEvent = SET_CURL_TO_LEFT;
 
-        // First we make sure it's not over or below page. Pages are
-        // supposed to be same height so it really doesn't matter do we use
-        // left or right one.
-        if (mDragStartPos.y > rightRect.top) {
-            mDragStartPos.y = rightRect.top;
-        } else if (mDragStartPos.y < rightRect.bottom) {
-            mDragStartPos.y = rightRect.bottom;
-        }
+		mAnimate = true;
+		requestRender();
+	}
 
-        // Then we have to make decisions for the user whether curl is going
-        // to happen from left or right, and on which page.
-        if (mViewMode == SHOW_TWO_PAGES) {
-            // If we have an open book and pointer is on the left from right
-            // page we'll mark drag position to left edge of left page.
-            // Additionally checking mCurrentIndex is higher than zero tells
-            // us there is a visible page at all.
-            if (mDragStartPos.x < rightRect.left && mCurrentIndex > 0) {
-                mDragStartPos.x = leftRect.left;
-                startCurl(CURL_LEFT);
-            }
-        } else if (mViewMode == SHOW_ONE_PAGE) {
-            float halfX = (rightRect.right + rightRect.left) / 2;
-            if (mDragStartPos.x < halfX && mCurrentIndex > 0) {
-                mDragStartPos.x = rightRect.left;
-                startCurl(CURL_LEFT);
-            }
-        }
-        // If we have are in curl state, let this case clause flow through
-        // to next one. We have pointer position and drag position defined
-        // and this will create first render request given these points.
-        if (mCurlState == CURL_NONE) {
-            return ;
-        }
+	public void pagePrevious(){
+		if ((mAnimate && mAnimationTargetEvent != DO_NOTHING) || mPageProvider == null) {
+			return;
+		}
+		// We need page rects quite extensively so get them for later use.
+		RectF rightRect = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT);
+		RectF leftRect = mRenderer.getPageRect(CurlRenderer.PAGE_LEFT);
 
-        if(curlAnimatorListener != null){
-            curlAnimatorListener.onStart(mCurlState);
-            startListen = true;
-        }
+		int w = this.mPageBitmapWidth;
+		int h =  this.mPageBitmapHeight;
 
-        mAnimationSource.set(mPointerPosOld);
-        mAnimationStartTime = SystemClock.uptimeMillis();
-        mAnimationDurationTime = 400;
+		// Store pointer position.
+		mPointerPos.mPos.set(-0.5f,0);
+		mPointerPosOld.set(mPointerPos.mPos);
+		mPointerPos.mPos.set(0, h/2);
+		//L.e("----->> start pos: x="+w+"   y="+h * 2/3);
+		mRenderer.translate(mPointerPos.mPos);
+		mPointerPos.mPressure = 0.0f;
 
-        // --- TOP
-        // On right side target is always right page's right border.
-        mAnimationTarget.set(mDragStartPos);
-        mAnimationTarget.x = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
-        mAnimationTargetEvent = SET_CURL_TO_RIGHT;
-        completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
 
-        mAnimate = true;
-        requestRender();
-    }
+		// Once we receive pointer down event its position is mapped to
+		// right or left edge of page and that'll be the position from where
+		// user is holding the paper to make curl happen.
+		mDragStartPos.set(mPointerPos.mPos);
+
+		// First we make sure it's not over or below page. Pages are
+		// supposed to be same height so it really doesn't matter do we use
+		// left or right one.
+		if (mDragStartPos.y > rightRect.top) {
+			mDragStartPos.y = rightRect.top;
+		} else if (mDragStartPos.y < rightRect.bottom) {
+			mDragStartPos.y = rightRect.bottom;
+		}
+
+		// Then we have to make decisions for the user whether curl is going
+		// to happen from left or right, and on which page.
+		if (mViewMode == SHOW_TWO_PAGES) {
+			// If we have an open book and pointer is on the left from right
+			// page we'll mark drag position to left edge of left page.
+			// Additionally checking mCurrentIndex is higher than zero tells
+			// us there is a visible page at all.
+			if (mDragStartPos.x < rightRect.left && mCurrentIndex > 0) {
+				mDragStartPos.x = leftRect.left;
+				startCurl(CURL_LEFT);
+			}
+		} else if (mViewMode == SHOW_ONE_PAGE) {
+			float halfX = (rightRect.right + rightRect.left) / 2;
+			if (mDragStartPos.x < halfX && mCurrentIndex > 0) {
+				mDragStartPos.x = rightRect.left;
+				startCurl(CURL_LEFT);
+			}
+		}
+		// If we have are in curl state, let this case clause flow through
+		// to next one. We have pointer position and drag position defined
+		// and this will create first render request given these points.
+		if (mCurlState == CURL_NONE) {
+			return ;
+		}
+
+		if(curlAnimatorListener != null){
+			curlAnimatorListener.onStart(mCurlState);
+			startListen = true;
+		}
+
+		mAnimationSource.set(mPointerPosOld);
+		mAnimationStartTime = SystemClock.uptimeMillis();
+		mAnimationDurationTime = 400;
+
+		// --- TOP
+		// On right side target is always right page's right border.
+		mAnimationTarget.set(mDragStartPos);
+		mAnimationTarget.x = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
+		mAnimationTargetEvent = SET_CURL_TO_RIGHT;
+		completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
+
+		mAnimate = true;
+		requestRender();
+	}
 
 	/**
 	 * Provider for feeding 'book' with bitmaps which are used for rendering
