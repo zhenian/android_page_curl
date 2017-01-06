@@ -240,6 +240,8 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 	private boolean isDrag = false;
 	private boolean isInitCurl = false;
 	private PointF firstPoint = null;
+	private PointF firstDragPoint = null;
+	private long drayDownTime = 0;
 
 	@Override
 	public boolean onTouch(View view, MotionEvent me) {
@@ -264,159 +266,192 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 		}
 
 		switch (me.getAction()) {
-		case MotionEvent.ACTION_DOWN: {
-			isDrag = false;
-			isInitCurl = false;
+			case MotionEvent.ACTION_DOWN: {
+				isDrag = false;
+				isInitCurl = false;
+				firstPoint = new PointF(me.getRawX(), me.getRawY());
+				drayDownTime = System.currentTimeMillis();
+				break;
+			}
+			case MotionEvent.ACTION_MOVE: {
 
-			firstPoint = new PointF(me.getRawX(), me.getRawY());
-			L.e("--->>ACTION_DOWN firstPoint = "+firstPoint.toString());
-			break;
-		}
-		case MotionEvent.ACTION_MOVE: {
-
-			if(!isDrag){
-				if(firstPoint == null){
-					firstPoint = new PointF(me.getRawX(), me.getRawY());
-					L.e("--->>ACTION_MOVE firstPoint = "+firstPoint.toString());
-				}else{
-					double x = me.getRawX() - firstPoint.x;
-					double y = me.getRawY() - firstPoint.y;
-					double mvLength = Math.sqrt((x*x+y*y));
-					L.e("--->>ACTION_MOVE "+mvLength);
-					if(mvLength > 4.0){
+				if(!isDrag){
+					if(firstPoint == null){
+						firstPoint = new PointF(me.getRawX(), me.getRawY());
+					}else{
+						double x = me.getRawX() - firstPoint.x;
+						double y = me.getRawY() - firstPoint.y;
+						double mvLength = Math.sqrt((x*x+y*y));
+						// move over 4 , go in drag mode
+						if(mvLength >= 4.0){
+							isDrag = true;
+						}
+					}
+					// or touch down over 0.2 seconds, go in drag mode
+					if((System.currentTimeMillis()-drayDownTime) > 200){ // 0.2s
 						isDrag = true;
 					}
+					if(isDrag){
+						// when first in drag, set the first drag point
+						firstDragPoint = new PointF(me.getX(),me.getY());
+						// make init curl next touch event
+						return true;
+					}
 				}
+
+				if(isDrag){
+					if(!isInitCurl){
+
+						// Once we receive pointer down event its position is mapped to
+						// right or left edge of page and that'll be the position from where
+						// user is holding the paper to make curl happen.
+						mDragStartPos.set(mPointerPos.mPos);
+
+						// First we make sure it's not over or below page. Pages are
+						// supposed to be same height so it really doesn't matter do we use
+						// left or right one.
+						if (mDragStartPos.y > rightRect.top) {
+							mDragStartPos.y = rightRect.top;
+						} else if (mDragStartPos.y < rightRect.bottom) {
+							mDragStartPos.y = rightRect.bottom;
+						}
+
+						// Then we have to make decisions for the user whether curl is going
+						// to happen from left or right, and on which page.
+						if (mViewMode == SHOW_TWO_PAGES) {
+							// If we have an open book and pointer is on the left from right
+							// page we'll mark drag position to left edge of left page.
+							// Additionally checking mCurrentIndex is higher than zero tells
+							// us there is a visible page at all.
+							if (mDragStartPos.x < rightRect.left && mCurrentIndex > 0) {
+								mDragStartPos.x = leftRect.left;
+								startCurl(CURL_LEFT);
+							}
+							// Otherwise check pointer is on right page's side.
+							else if (mDragStartPos.x >= rightRect.left && mCurrentIndex < mPageProvider.getPageCount()) {
+								mDragStartPos.x = rightRect.right;
+								if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
+									return false;
+								}
+								startCurl(CURL_RIGHT);
+							}
+						} else if (mViewMode == SHOW_ONE_PAGE) {
+							//
+							float moveXOffset = me.getX() - (firstDragPoint==null?0:firstDragPoint.x);
+							if(moveXOffset >= 0 && mCurrentIndex > 0) {
+								mDragStartPos.x = rightRect.left;
+								startCurl(CURL_LEFT);
+							}else if(moveXOffset < 0 && mCurrentIndex < mPageProvider.getPageCount()) {
+								mDragStartPos.x = rightRect.right;
+								if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
+									return false;
+								}
+								startCurl(CURL_RIGHT);
+							}
+						}
+						// If we have are in curl state, let this case clause flow through
+						// to next one. We have pointer position and drag position defined
+						// and this will create first render request given these points.
+						if (mCurlState == CURL_NONE) {
+							return false;
+						}
+
+						mAnimationSource.set(mDragStartPos);
+						mAnimationTarget.set(mPointerPos.mPos);
+						mAnimationStartTime = SystemClock.uptimeMillis();
+						mAnimationDurationTime = 300;
+						mAnimationTargetEvent = DO_NOTHING;
+						if(curlAnimatorListener != null){
+							curlAnimatorListener.onStart(mCurlState);
+							startListen = true;
+						}
+						mAnimate = true;
+						isInitCurl = true;
+						requestRender();
+					}
+
+					if (mAnimate) {
+						mAnimationTarget.set(mPointerPos.mPos);
+					}
+				}
+				break;
 			}
-
-			if(isDrag){
-				if(!isInitCurl){
-
-					// Once we receive pointer down event its position is mapped to
-					// right or left edge of page and that'll be the position from where
-					// user is holding the paper to make curl happen.
-					mDragStartPos.set(mPointerPos.mPos);
-
-					// First we make sure it's not over or below page. Pages are
-					// supposed to be same height so it really doesn't matter do we use
-					// left or right one.
-					if (mDragStartPos.y > rightRect.top) {
-						mDragStartPos.y = rightRect.top;
-					} else if (mDragStartPos.y < rightRect.bottom) {
-						mDragStartPos.y = rightRect.bottom;
-					}
-
-					// Then we have to make decisions for the user whether curl is going
-					// to happen from left or right, and on which page.
-					if (mViewMode == SHOW_TWO_PAGES) {
-						// If we have an open book and pointer is on the left from right
-						// page we'll mark drag position to left edge of left page.
-						// Additionally checking mCurrentIndex is higher than zero tells
-						// us there is a visible page at all.
-						if (mDragStartPos.x < rightRect.left && mCurrentIndex > 0) {
-							mDragStartPos.x = leftRect.left;
-							startCurl(CURL_LEFT);
-						}
-						// Otherwise check pointer is on right page's side.
-						else if (mDragStartPos.x >= rightRect.left && mCurrentIndex < mPageProvider.getPageCount()) {
-							mDragStartPos.x = rightRect.right;
-							if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
-								return false;
-							}
-							startCurl(CURL_RIGHT);
-						}
-					} else if (mViewMode == SHOW_ONE_PAGE) {
-						float halfX = (rightRect.right + rightRect.left) / 2;
-						if (mDragStartPos.x < halfX && mCurrentIndex > 0) {
-							mDragStartPos.x = rightRect.left;
-							startCurl(CURL_LEFT);
-						} else if (mDragStartPos.x >= halfX && mCurrentIndex < mPageProvider.getPageCount()) {
-							mDragStartPos.x = rightRect.right;
-							if (!mAllowLastPageCurl && mCurrentIndex >= mPageProvider.getPageCount() - 1) {
-								return false;
-							}
-							startCurl(CURL_RIGHT);
-						}
-					}
-					// If we have are in curl state, let this case clause flow through
-					// to next one. We have pointer position and drag position defined
-					// and this will create first render request given these points.
-					if (mCurlState == CURL_NONE) {
-						return false;
-					}
-
-					mAnimationSource.set(mDragStartPos);
-					mAnimationTarget.set(mPointerPos.mPos);
+			case MotionEvent.ACTION_CANCEL:{
+				//L.e("MotionEvent.ACTION_CANCEL");
+			}
+			case MotionEvent.ACTION_UP: {
+				//L.e("MotionEvent.ACTION_UP:"+(System.currentTimeMillis()-drayDownTime));
+				if (mCurlState == CURL_LEFT || mCurlState == CURL_RIGHT) {
+					// Animation source is the point from where animation starts.
+					// Also it's handled in a way we actually simulate touch events
+					// meaning the output is exactly the same as if user drags the
+					// page to other side. While not producing the best looking
+					// result (which is easier done by altering curl position and/or
+					// direction directly), this is done in a hope it made code a
+					// bit more readable and easier to maintain.
+					mAnimationSource.set(mPointerPosOld);
 					mAnimationStartTime = SystemClock.uptimeMillis();
-					mAnimationDurationTime = 300;
-					mAnimationTargetEvent = DO_NOTHING;
-					if(curlAnimatorListener != null){
-						curlAnimatorListener.onStart(mCurlState);
-						startListen = true;
+					mAnimationDurationTime = 400;
+
+					// Given the explanation, here we decide whether to simulate
+					// drag to left or right end.
+
+					if(mViewMode == SHOW_ONE_PAGE){
+						float moveXOffset = me.getX() - (firstDragPoint==null?0:firstDragPoint.x);
+						if(moveXOffset < 0){
+							moveXOffset = -moveXOffset;
+						}
+
+						float flag =  20; // drag move over 20, curl animator will work continue
+
+						boolean curlToRight;
+						if(mCurlState == CURL_RIGHT){
+							curlToRight = moveXOffset <= flag;
+						}else{
+							curlToRight = moveXOffset > flag;
+						}
+						if(curlToRight){
+							mAnimationTarget.set(mDragStartPos);
+							mAnimationTarget.x = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
+							mAnimationTargetEvent = SET_CURL_TO_RIGHT;
+							completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
+						}else {
+							mAnimationTarget.set(mDragStartPos);
+							mAnimationTarget.x = leftRect.left;
+							mAnimationTargetEvent = SET_CURL_TO_LEFT;
+							completeAnimationTargetEvent = SET_CURL_TO_LEFT;
+						}
+					}else{
+						if (mViewMode == SHOW_TWO_PAGES && mPointerPos.mPos.x > rightRect.left) {
+							// On right side target is always right page's right border.
+							mAnimationTarget.set(mDragStartPos);
+							mAnimationTarget.x = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
+							mAnimationTargetEvent = SET_CURL_TO_RIGHT;
+							completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
+						} else {
+							// On left side target depends on visible pages.
+							mAnimationTarget.set(mDragStartPos);
+							if (mCurlState == CURL_RIGHT || mViewMode == SHOW_TWO_PAGES) {
+								mAnimationTarget.x = leftRect.left;
+							} else {
+								mAnimationTarget.x = rightRect.left;
+							}
+							mAnimationTargetEvent = SET_CURL_TO_LEFT;
+							completeAnimationTargetEvent = SET_CURL_TO_LEFT;
+						}
 					}
+
 					mAnimate = true;
-					isInitCurl = true;
 					requestRender();
 				}
-
-				if (mAnimate) {
-					mAnimationTarget.set(mPointerPos.mPos);
-				}
-			}
-			break;
-		}
-		case MotionEvent.ACTION_CANCEL:{
-			L.e("MotionEvent.ACTION_CANCEL");
-		}
-		case MotionEvent.ACTION_UP: {
-			L.e("MotionEvent.ACTION_UP");
-			if (mCurlState == CURL_LEFT || mCurlState == CURL_RIGHT) {
-				// Animation source is the point from where animation starts.
-				// Also it's handled in a way we actually simulate touch events
-				// meaning the output is exactly the same as if user drags the
-				// page to other side. While not producing the best looking
-				// result (which is easier done by altering curl position and/or
-				// direction directly), this is done in a hope it made code a
-				// bit more readable and easier to maintain.
-				mAnimationSource.set(mPointerPosOld);
-				mAnimationStartTime = SystemClock.uptimeMillis();
-				mAnimationDurationTime = 400;
-
-				// Given the explanation, here we decide whether to simulate
-				// drag to left or right end.
-				if ((mViewMode == SHOW_ONE_PAGE
-						&& mPointerPos.mPos.x > (rightRect.left + rightRect.right) / 2)
-						|| mViewMode == SHOW_TWO_PAGES
-						&& mPointerPos.mPos.x > rightRect.left) {
-					// On right side target is always right page's right border.
-					mAnimationTarget.set(mDragStartPos);
-					mAnimationTarget.x = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
-					mAnimationTargetEvent = SET_CURL_TO_RIGHT;
-					completeAnimationTargetEvent = SET_CURL_TO_RIGHT;
-				} else {
-					// On left side target depends on visible pages.
-					mAnimationTarget.set(mDragStartPos);
-					if (mCurlState == CURL_RIGHT || mViewMode == SHOW_TWO_PAGES) {
-						mAnimationTarget.x = leftRect.left;
-					} else {
-						mAnimationTarget.x = rightRect.left;
+				if(!isDrag){
+					//L.e("点击事件");
+					if(curlAnimatorListener != null){
+						curlAnimatorListener.onTap(new PointF(me.getX(),me.getY()), new PointF(me.getRawX(),me.getRawY()));
 					}
-					mAnimationTargetEvent = SET_CURL_TO_LEFT;
-					completeAnimationTargetEvent = SET_CURL_TO_LEFT;
 				}
-				mAnimate = true;
-				requestRender();
+				break;
 			}
-			if(!isDrag){
-				L.e("点击事件");
-                if(this.curlAnimatorListener != null){
-                    this.curlAnimatorListener.onTap(
-                            new PointF(me.getX(),me.getY()),
-                            new PointF(me.getRawX(),me.getRawY()));
-                }
-			}
-			break;
-		}
 		}
 
 		return true;
@@ -838,8 +873,8 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 
         // Store pointer position.
         mPointerPosOld.set(mPointerPos.mPos);
-        mPointerPos.mPos.set(w, h/2);
-        L.e("----->> start pos: x="+w+"   y="+h/2);
+        mPointerPos.mPos.set(w, h * 2/3);
+        L.e("----->> start pos: x="+w+"   y="+ h * 2/3);
         mRenderer.translate(mPointerPos.mPos);
         mPointerPos.mPressure = 0.0f;
 
@@ -892,7 +927,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 
         mAnimationSource.set(mPointerPosOld);
         mAnimationStartTime = SystemClock.uptimeMillis();
-        mAnimationDurationTime = 600;
+        mAnimationDurationTime = 400;
 
 
         // --- TOP
@@ -923,8 +958,8 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 
         // Store pointer position.
         mPointerPosOld.set(mPointerPos.mPos);
-        mPointerPos.mPos.set(0, h/2);
-        L.e("----->> start pos: x="+w+"   y="+h/2);
+        mPointerPos.mPos.set(0,  h * 2/3);
+        L.e("----->> start pos: x="+w+"   y="+ h * 2/3);
         mRenderer.translate(mPointerPos.mPos);
         mPointerPos.mPressure = 0.0f;
 
@@ -975,7 +1010,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener, Cur
 
         mAnimationSource.set(mPointerPosOld);
         mAnimationStartTime = SystemClock.uptimeMillis();
-        mAnimationDurationTime = 600;
+        mAnimationDurationTime = 400;
 
         // --- TOP
         // On right side target is always right page's right border.
